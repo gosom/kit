@@ -167,8 +167,6 @@ func ServerRun(ctx context.Context, cfg ServerConfig) error {
 	case err := <-errs:
 		return err
 	}
-
-	return nil
 }
 
 // getSelfSignedOrLetsEncryptCert returns a function that returns a certificate

@@ -32,10 +32,10 @@ type RouterConfig struct {
 
 	// CorsCfg by default allows all. Configure properly
 	CorsCfg CorsConfig
-}
 
-type router struct {
-	*chi.Mux
+	// ErrorReporter is the error reporter to be used to report errors
+	// By default, it uses the default error reporter (core.StubErrorReporter)
+	ErrorReporter core.ErrorReporter
 }
 
 func NewRouter(cfg RouterConfig) (r Router) {
@@ -48,7 +48,13 @@ func NewRouter(cfg RouterConfig) (r Router) {
 		ipStrategy = cfg.RealIPStrategy
 	}
 	if !cfg.NotUseDefaultMiddlewares {
-		r.Use(RequestLogger)
+		var reporter core.ErrorReporter
+		if cfg.ErrorReporter == nil {
+			reporter = &core.StubErrorReporter{}
+		} else {
+			reporter = cfg.ErrorReporter
+		}
+		r.Use(RequestLogger(reporter))
 		r.Use(Recover)
 		r.Use(RealIP(ipStrategy))
 		if cfg.Timeout > -1 {

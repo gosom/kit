@@ -1,9 +1,28 @@
 package core
 
+import "strings"
+
 // ApiError is an interface for all errors in the API.
 type ApiError interface {
 	// ApiError returns an HTTP status code and a message.
 	ApiError() (int, string)
+}
+
+type StackTracer interface {
+	StackTrace() string
+}
+
+func StackFormater(s string) []string {
+	s = strings.Replace(s, "\t", "", -1)
+	l := strings.Split(s, "\n")
+	n := 0
+	for i := range l {
+		if l[i] != "" {
+			l[n] = l[i]
+			n++
+		}
+	}
+	return l[:n]
 }
 
 // some common errors

@@ -30,43 +30,47 @@ func NewCors(opts CorsConfig) *cors.Cors {
 	}
 }
 
-// RequestLogger is a middleware that logs all requests.
-// it also injects a logger into the request context.
-// additinally it adds a request id to the request context,
-func RequestLogger(next http.Handler) http.Handler {
+// Timeout is a middleware that sets a timeout on the request context.
+func RequestLogger(report core.ErrorReporter) func(http.Handler) http.Handler {
 	log := logging.Get()
-	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		start := TimeProvider()
-		ctxLogger := log.With("request_id", RequestIDProvider())
-		r = r.WithContext(logging.NewContext(r.Context(), ctxLogger))
-		lrw := &logResponseWriter{ResponseWriter: w, status: http.StatusOK}
-		defer func() {
-			level := logging.INFO
-			switch {
-			case lrw.status >= 400 && lrw.status < 500:
-				level = logging.WARN
-			case lrw.status >= 500 || lrw.status < 200:
-				level = logging.ERROR
-			}
-			fields := []any{
-				"status", lrw.status,
-				"bytes", lrw.bytesWritten,
-				"method", r.Method,
-				"path", r.URL.Path,
-				"query", r.URL.RawQuery,
-				"ip", core.IPFromContext(r.Context()),
-				"user-agent", r.UserAgent(),
-				"latency", TimeProvider().Sub(start),
-			}
-			if lrw.status >= http.StatusInternalServerError {
-				if err := core.ErrorFromContext(r.Context()); err != nil {
-					fields = append(fields, "error", err)
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			start := TimeProvider()
+			reqID := RequestIDProvider()
+			ctxLogger := log.With("request_id", reqID)
+			r = r.WithContext(core.NewContextWithRequestID(r.Context(), reqID))
+			r = r.WithContext(logging.NewContext(r.Context(), ctxLogger))
+			lrw := &logResponseWriter{ResponseWriter: w, status: http.StatusOK}
+			defer func() {
+				level := logging.INFO
+				switch {
+				case lrw.status >= 400 && lrw.status < 500:
+					level = logging.WARN
+				case lrw.status >= 500 || lrw.status < 200:
+					level = logging.ERROR
 				}
-			}
-			ctxLogger.Log(level, http.StatusText(lrw.status), fields...)
-		}()
-		next.ServeHTTP(lrw, r)
-	})
+				fields := []any{
+					"status", lrw.status,
+					"bytes", lrw.bytesWritten,
+					"method", r.Method,
+					"path", r.URL.Path,
+					"query", r.URL.RawQuery,
+					"ip", core.IPFromContext(r.Context()),
+					"user-agent", r.UserAgent(),
+					"latency", TimeProvider().Sub(start),
+				}
+				if lrw.status >= http.StatusInternalServerError {
+					err := core.ErrorFromContext(r.Context())
+					if err != nil {
+						fields = append(fields, "error", err)
+					}
+					report.ReportError(r.Context(), r, err)
+				}
+				ctxLogger.Log(level, http.StatusText(lrw.status), fields...)
+			}()
+			next.ServeHTTP(lrw, r)
+		})
+	}
 }
 
 // Timeout is a middleware that sets a timeout on the request context.
@@ -84,16 +88,17 @@ func Timeout(dur time.Duration) func(http.Handler) http.Handler {
 // Recover is a middleware that catches panics
 func Recover(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if rec := recover(); rec != nil {
-			switch err := rec.(type) {
-			case error:
-				JSONError(w, r, core.WrapErrorWithStack(err, debug.Stack()))
-			default:
-				toErr := core.WrapErrorWithStack(fmt.Errorf("%v", err), debug.Stack())
-				JSONError(w, r, toErr)
+		defer func() {
+			if rec := recover(); rec != nil {
+				switch err := rec.(type) {
+				case error:
+					JSONError(w, r, core.WrapErrorWithStack(err, debug.Stack()))
+				default:
+					toErr := core.WrapErrorWithStack(fmt.Errorf("%v", err), debug.Stack())
+					JSONError(w, r, toErr)
+				}
 			}
-			return
-		}
+		}()
 		next.ServeHTTP(w, r)
 	})
 }

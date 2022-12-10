@@ -15,6 +15,7 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/realclientip/realclientip-go v1.0.0 // indirect
+	github.com/rollbar/rollbar-go v1.4.5 // indirect
 	github.com/rs/cors v1.8.2 // indirect
 	github.com/rs/xid v1.4.0 // indirect
 	github.com/stretchr/testify v1.8.1 // indirect
