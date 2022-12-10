@@ -1,4 +1,4 @@
-package httpserver
+package web
 
 import (
 	"context"
@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"time"
 
-	"github.com/gosom/kit/logger"
+	"github.com/gosom/kit/logging"
 	"golang.org/x/crypto/acme/autocert"
 )
 
@@ -50,14 +50,7 @@ type ServerConfig struct {
 	// UseTLS when true it uses TLS
 	UseTLS bool
 	// LogLevel defaults to logger.InfoLevel
-	LogLevel *int
-}
-
-func (cfg ServerConfig) GetLogLevel() int {
-	if cfg.LogLevel == nil {
-		return 1
-	}
-	return *cfg.LogLevel
+	LogLevel logging.Level
 }
 
 // setDefaults sets the default values for the web server
@@ -88,9 +81,8 @@ func setDefaults(cfg ServerConfig) ServerConfig {
 
 // Run starts the webserver. It returns an error if the webserver is not
 // exited gracefully
-func Run(ctx context.Context, cfg ServerConfig) error {
-	log := logger.Get().Level(logger.IntToLevel(cfg.GetLogLevel())).With().Str("component", "http").Logger()
-	log.Info().Str("host", cfg.Host).Msg("starting http server")
+func ServerRun(ctx context.Context, cfg ServerConfig) error {
+	logging.Log(cfg.LogLevel, "starting http server", "component", "http")
 	cfg = setDefaults(cfg)
 	if cfg.Router == nil {
 		return errors.New("no router defined")
@@ -128,7 +120,8 @@ func Run(ctx context.Context, cfg ServerConfig) error {
 			errs <- srv.ListenAndServeTLS("", "")
 		}
 	}()
-	log.Info().Str("host", cfg.Host).Msg("http server started")
+	logging.Log(cfg.LogLevel, "http server started", "component", "http",
+		"host", cfg.Host, "tls", cfg.UseTLS)
 
 	serverShutdown := func() error {
 		const timeout = 5 * time.Second
@@ -144,14 +137,16 @@ func Run(ctx context.Context, cfg ServerConfig) error {
 	var err error
 	defer func() {
 		if err != nil {
-			log.Error().Err(err).Msg("http server exited with error")
+			logging.Log(logging.ERROR, "http server exited with error",
+				"component", "http", "error", err)
 		} else {
-			log.Info().Msg("http server exited gracefully")
+			logging.Log(logging.INFO, "http server exited gracefully",
+				"component", "http")
 		}
 	}()
 
 	select {
-	case _ = <-ctx.Done():
+	case <-ctx.Done():
 		if err = serverShutdown(); err != nil {
 			return err
 		}
@@ -160,7 +155,7 @@ func Run(ctx context.Context, cfg ServerConfig) error {
 			err = nil
 		}
 		return err
-	case _ = <-sigs:
+	case <-sigs:
 		if err = serverShutdown(); err != nil {
 			return err
 		}
