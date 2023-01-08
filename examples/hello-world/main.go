@@ -43,7 +43,7 @@ func main() {
 	}
 
 	server := web.NewHttpServer(cfg)
-	if err := server.Start(ctx); err != nil {
+	if err := server.ListenAndServe(ctx); err != nil {
 		panic(err)
 	}
 }

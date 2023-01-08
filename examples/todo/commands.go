@@ -80,6 +80,5 @@ func (o *TodoStatusUpdated) Apply(aggregate es.AggregateRoot) error {
 	if !ok {
 		return fmt.Errorf("%w but is %T", es.ErrInvalidAggregate, aggregate)
 	}
-	agg.Todo.UpdateStatus(o.Status)
-	return nil
+	return agg.Todo.UpdateStatus(o.Status)
 }
