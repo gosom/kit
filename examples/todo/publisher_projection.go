@@ -72,6 +72,6 @@ func (p *ProjectionBuilder) processTodoStatusUpdated(ctx context.Context, tx *sq
 	const q = `UPDATE todos
 	SET status = $1, updated_at = $2
 	WHERE id = $3`
-	_, err := tx.ExecContext(ctx, q, "completed", ts, e.ID)
+	_, err := tx.ExecContext(ctx, q, e.Status, ts, e.ID)
 	return err
 }
