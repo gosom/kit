@@ -26,12 +26,12 @@ var (
 type EventError struct {
 	EventBase
 
-	Err error
+	Err string
 }
 
 func NewEventErrorFromError(err error, expectedVersion int, rec CommandRecord) EventError {
 	ev := EventError{
-		Err: err,
+		Err: err.Error(),
 	}
 	return ev
 }

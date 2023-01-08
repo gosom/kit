@@ -97,9 +97,9 @@ func getWebServer(store es.EventStore, registry *es.Registry, dispatcher es.Comm
 		web.JSON(w, r, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	api.RegisterHandlers(mux, dispatcher)
+	eshttp.RegisterDomainRoutes(todo.DOMAIN, mux, store, registry, todo.NewTodoAggregate, dispatcher)
 
-	eshttp.RegisterDomainRoutes(todo.DOMAIN, mux, store, registry, todo.NewTodoAggregate)
+	api.RegisterHandlers(mux)
 
 	webServerCfg := web.ServerConfig{
 		Router: mux,

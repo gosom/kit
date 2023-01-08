@@ -1,6 +1,7 @@
 package web
 
 import (
+	"encoding/json"
 	"net/http"
 	"time"
 
@@ -40,4 +41,8 @@ func (w *logResponseWriter) Write(b []byte) (int, error) {
 
 func StringURLParam(r *http.Request, key string) string {
 	return chi.URLParam(r, key)
+}
+
+func DecodeBody(r *http.Request, v interface{}) error {
+	return json.NewDecoder(r.Body).Decode(v)
 }

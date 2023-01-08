@@ -11,33 +11,41 @@ go run cmd/app/main.go
 Create a Todo:
 
 ```
-curl -XPOST 'http://localhost:8080/todo' \
+curl --location --request POST 'http://localhost:8080/todo/commands' \
 --header 'Content-Type: application/json' \
 --data-raw '{
-    "title": "do task 1"
+    "name": "CreateTodo",
+    "payload": {
+        "id": "11186428-8f6c-11ed-bde4-13557563d9d6",
+        "title": "do task 1"
+    }
 }'
 ```
 
-Mark it completed (replace the uuid from the one you get from above):
+Mark it completed:
 
 ```
-curl -XPATCH 'http://localhost:8080/todo/b656ad49-4c8b-449a-9787-7407dc73ff47' \
+curl --location --request POST 'http://localhost:8080/todo/commands' \
 --header 'Content-Type: application/json' \
 --data-raw '{
-    "status": "completed"
+    "name": "UpdateTodoStatus",
+    "payload": {
+        "id": "11186428-8f6c-11ed-bde4-13557563d9d6",
+        "status": "completed"
+    }
 }'
 ```
 
 Get Aggregate:
 
 ```
-curl 'http://localhost:8080/domain/aggregates/todo-b656ad49-4c8b-449a-9787-7407dc73ff47'
+curl 'http://localhost:8080/todo/aggregates/todo-11186428-8f6c-11ed-bde4-13557563d9d6'
 ```
 
 Get Events:
 
 ```
-curl 'http://localhost:8080/domain/events/todo-b656ad49-4c8b-449a-9787-7407dc73ff47'
+curl 'http://localhost:8080/domain/events/todo-11186428-8f6c-11ed-bde4-13557563d9d6'
 ```
 
 Get Command:

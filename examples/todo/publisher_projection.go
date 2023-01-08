@@ -37,9 +37,7 @@ func (p *ProjectionBuilder) Publish(ctx context.Context, records ...es.EventReco
 		return err
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			p.log.Error("failed to rollback transaction", "error", err)
-		}
+		_ = tx.Rollback()
 	}()
 	for i := range events {
 		switch e := events[i].(type) {

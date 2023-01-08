@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 
 	"github.com/gosom/kit/core"
@@ -11,11 +12,12 @@ import (
 	"github.com/gosom/kit/web"
 )
 
-func RegisterDomainRoutes(domain string, mux web.Router, store es.EventStore, registry *es.Registry, aggFactory es.AggregateFactory) {
-	handler := NewDomainHandler(domain, store, registry, aggFactory)
-	mux.MethodFunc(http.MethodGet, "/domain/commands/{commandId}", handler.GetCommand)
-	mux.MethodFunc(http.MethodGet, "/domain/events/{aggregateId}", handler.GetEvents)
-	mux.MethodFunc(http.MethodGet, "/domain/aggregates/{aggregateId}", handler.GetAggregate)
+func RegisterDomainRoutes(domain string, mux web.Router, store es.EventStore, registry *es.Registry, aggFactory es.AggregateFactory, dispatcher es.CommandDispatcher) {
+	handler := NewDomainHandler(domain, store, registry, aggFactory, dispatcher)
+	mux.MethodFunc(http.MethodGet, fmt.Sprintf("/%s/commands/{commandId}", handler.domain), handler.GetCommand)
+	mux.MethodFunc(http.MethodPost, fmt.Sprintf("/%s/commands", handler.domain), handler.PostCommand)
+	mux.MethodFunc(http.MethodGet, fmt.Sprintf("/%s/events/{aggregateId}", handler.domain), handler.GetEvents)
+	mux.MethodFunc(http.MethodGet, fmt.Sprintf("/%s/aggregates/{aggregateId}", handler.domain), handler.GetAggregate)
 }
 
 type DomainHandler struct {
@@ -23,15 +25,62 @@ type DomainHandler struct {
 	store      es.EventStore
 	registry   *es.Registry
 	aggFactory es.AggregateFactory
+	dispatcher es.CommandDispatcher
 }
 
-func NewDomainHandler(domain string, store es.EventStore, registry *es.Registry, aggFactory es.AggregateFactory) *DomainHandler {
+func NewDomainHandler(domain string, store es.EventStore, registry *es.Registry, aggFactory es.AggregateFactory,
+	dispatcher es.CommandDispatcher) *DomainHandler {
 	return &DomainHandler{
 		domain:     domain,
 		store:      store,
 		registry:   registry,
 		aggFactory: aggFactory,
+		dispatcher: dispatcher,
 	}
+}
+
+type PostCommandRequest struct {
+	Name    string          `json:"name"`
+	Payload json.RawMessage `json:"payload"`
+}
+
+type PostCommandResponse struct {
+	ID string `json:"id"`
+}
+
+func (u *DomainHandler) PostCommand(w http.ResponseWriter, r *http.Request) {
+	var req PostCommandRequest
+	if err := web.DecodeBody(r, &req); err != nil {
+		web.JSONError(w, r, err)
+		return
+	}
+	conv, ok := u.registry.GetCommand(req.Name)
+	if !ok {
+		fmt.Println("command not found")
+		web.JSONError(w, r, core.ErrBadRequest)
+		return
+	}
+	cr := es.CommandRecord{
+		RecordBase: es.RecordBase{
+			Data:      req.Payload,
+			EventType: req.Name,
+		},
+	}
+	cmd, err := conv(cr)
+	if err != nil {
+		web.JSONError(w, r, err)
+		return
+	}
+	commandID, err := u.dispatcher.Dispatch(r.Context(), cmd)
+	if err != nil {
+		if errors.Is(err, es.ErrInvalidCommand) {
+			web.JSONError(w, r, core.ErrBadRequest)
+			return
+		}
+		web.JSONError(w, r, err)
+		return
+	}
+	web.JSON(w, r, http.StatusOK, PostCommandResponse{ID: commandID})
 }
 
 type GetCommandResponse es.CommandRecord

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/gosom/kit/lib"
@@ -38,6 +39,11 @@ func (e *CommandBase) Validate() error {
 	if len(e.aggregateID) == 0 {
 		return fmt.Errorf("Command AggregateID is required %w", ErrInvalidCommand)
 	}
+	before, after, ok := strings.Cut(e.aggregateID, "-")
+	if !ok || len(before) == 0 || len(after) == 0 {
+		return fmt.Errorf("Command AggregateID is invalid %w", ErrInvalidCommand)
+	}
+
 	if e.aggregateHash == 0 {
 		return fmt.Errorf("Command AggregateHash is required %w", ErrInvalidCommand)
 	}

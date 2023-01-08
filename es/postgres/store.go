@@ -111,9 +111,7 @@ func (e *EventStore) StoreCommandResults(ctx context.Context, commandID string, 
 		return err
 	}
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			e.log.Error("failed to rollback transaction", "error", err)
-		}
+		_ = tx.Rollback()
 	}()
 	if len(events) > 0 {
 		rs, err := tx.ExecContext(ctx, checkVersionStmt, len(events), events[0].AggregateID, expectedVersion)
