@@ -4,6 +4,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/go-chi/chi/v5"
 	"github.com/rs/xid"
 )
 
@@ -35,4 +36,8 @@ func (w *logResponseWriter) Write(b []byte) (int, error) {
 	}
 	w.bytesWritten += n
 	return n, err
+}
+
+func StringURLParam(r *http.Request, key string) string {
+	return chi.URLParam(r, key)
 }

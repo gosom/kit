@@ -42,8 +42,8 @@ func main() {
 		LogLevel: logging.INFO,
 	}
 
-	if err := web.ServerRun(ctx, cfg); err != nil {
+	server := web.NewHttpServer(cfg)
+	if err := server.Start(ctx); err != nil {
 		panic(err)
 	}
-
 }

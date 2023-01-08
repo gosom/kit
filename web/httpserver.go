@@ -14,6 +14,11 @@ import (
 	"golang.org/x/crypto/acme/autocert"
 )
 
+type HttpHandler interface {
+	http.Handler
+	MethodFunc(method string, pattern string, h http.HandlerFunc)
+}
+
 /* Generate self signed certificate note
 	openssl req -x509 -out localhost.crt -keyout localhost.key   -newkey rsa:2048 -nodes -sha256   -subj '/CN=localhost' -extensions EXT -config <( \
    printf "[dn]\nCN=localhost\n[req]\ndistinguished_name = dn\n[EXT]\nsubjectAltName=DNS:localhost\nkeyUsage=digitalSignature\nextendedKeyUsage=serverAuth") --keyout certs/localhost.key --out certs/localhost.crt
@@ -26,7 +31,7 @@ type ServerConfig struct {
 	// Host defaults to :8080
 	Host string
 	// Router is the http router
-	Router http.Handler
+	Router HttpHandler
 	// ReadTimeout defaults to 1m
 	ReadTimeout time.Duration
 	// IdleTimeout if it's zero Go uses by default the ReadTimeout
@@ -79,25 +84,27 @@ func setDefaults(cfg ServerConfig) ServerConfig {
 	return cfg
 }
 
-// Run starts the webserver. It returns an error if the webserver is not
-// exited gracefully
-func ServerRun(ctx context.Context, cfg ServerConfig) error {
-	logging.Log(cfg.LogLevel, "starting http server", "component", "http")
-	cfg = setDefaults(cfg)
-	if cfg.Router == nil {
-		return errors.New("no router defined")
-	}
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, cfg.ExitSignals...)
+type HttpServer struct {
+	srv  *http.Server
+	cfg  ServerConfig
+	sigs chan os.Signal
+}
 
-	srv := http.Server{
-		Addr:              cfg.Host,
-		Handler:           cfg.Router,
-		ReadHeaderTimeout: cfg.ReadHeaderTimeout,
-		ReadTimeout:       cfg.ReadTimeout,
-		IdleTimeout:       cfg.IdleTimeout,
-		WriteTimeout:      cfg.WriteTimeout,
-		MaxHeaderBytes:    cfg.MaxHeaderBytes,
+// NewHttpServer creates a new http server
+func NewHttpServer(cfg ServerConfig) *HttpServer {
+	cfg = setDefaults(cfg)
+	ans := HttpServer{
+		srv: &http.Server{
+			Addr:              cfg.Host,
+			Handler:           cfg.Router,
+			ReadTimeout:       cfg.ReadTimeout,
+			ReadHeaderTimeout: cfg.ReadHeaderTimeout,
+			WriteTimeout:      cfg.WriteTimeout,
+			IdleTimeout:       cfg.IdleTimeout,
+			MaxHeaderBytes:    cfg.MaxHeaderBytes,
+		},
+		cfg:  cfg,
+		sigs: make(chan os.Signal, 1),
 	}
 	if cfg.UseTLS {
 		// thanks to https://marcofranssen.nl/build-a-go-webserver-on-http-2-using-letsencrypt
@@ -107,32 +114,17 @@ func ServerRun(ctx context.Context, cfg ServerConfig) error {
 			Cache:      autocert.DirCache("certs"),
 		}
 
-		srv.TLSConfig = certManager.TLSConfig()
-		srv.TLSConfig.GetCertificate = getSelfSignedOrLetsEncryptCert(&certManager)
+		ans.srv.TLSConfig = certManager.TLSConfig()
+		ans.srv.TLSConfig.GetCertificate = getSelfSignedOrLetsEncryptCert(&certManager)
 	}
+	signal.Notify(ans.sigs, cfg.ExitSignals...)
+	return &ans
+}
 
-	errs := make(chan error, 1)
-	go func() {
-		switch srv.TLSConfig {
-		case nil:
-			errs <- srv.ListenAndServe()
-		default:
-			errs <- srv.ListenAndServeTLS("", "")
-		}
-	}()
-	logging.Log(cfg.LogLevel, "http server started", "component", "http",
-		"host", cfg.Host, "tls", cfg.UseTLS)
-
-	serverShutdown := func() error {
-		const timeout = 5 * time.Second
-		ctx2, cancel := context.WithTimeout(ctx, timeout)
-		defer cancel()
-		if err := srv.Shutdown(ctx2); err != nil {
-			if err := srv.Close(); err != nil {
-				return err
-			}
-		}
-		return nil
+// ListenAndServe starts the http server
+func (o *HttpServer) ListenAndServe(ctx context.Context) error {
+	if o.srv.Handler == nil {
+		return errors.New("no router defined")
 	}
 	var err error
 	defer func() {
@@ -144,7 +136,26 @@ func ServerRun(ctx context.Context, cfg ServerConfig) error {
 				"component", "http")
 		}
 	}()
-
+	serverShutdown := func() error {
+		const timeout = 5 * time.Second
+		ctx2, cancel := context.WithTimeout(ctx, timeout)
+		defer cancel()
+		if err := o.srv.Shutdown(ctx2); err != nil {
+			if err := o.srv.Close(); err != nil {
+				return err
+			}
+		}
+		return nil
+	}
+	errs := make(chan error, 1)
+	go func() {
+		switch o.srv.TLSConfig {
+		case nil:
+			errs <- o.srv.ListenAndServe()
+		default:
+			errs <- o.srv.ListenAndServeTLS("", "")
+		}
+	}()
 	select {
 	case <-ctx.Done():
 		if err = serverShutdown(); err != nil {
@@ -155,7 +166,7 @@ func ServerRun(ctx context.Context, cfg ServerConfig) error {
 			err = nil
 		}
 		return err
-	case <-sigs:
+	case <-o.sigs:
 		if err = serverShutdown(); err != nil {
 			return err
 		}
