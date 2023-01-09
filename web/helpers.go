@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/gosom/kit/core"
 	"github.com/rs/xid"
 )
 
@@ -43,6 +44,14 @@ func StringURLParam(r *http.Request, key string) string {
 	return chi.URLParam(r, key)
 }
 
-func DecodeBody(r *http.Request, v interface{}) error {
-	return json.NewDecoder(r.Body).Decode(v)
+func DecodeBody(r *http.Request, v interface{}, validate bool) error {
+	if err := json.NewDecoder(r.Body).Decode(v); err != nil {
+		return err
+	}
+	switch {
+	case validate:
+		return core.Validate(v)
+	default:
+		return nil
+	}
 }

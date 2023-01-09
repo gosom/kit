@@ -40,7 +40,7 @@ func NewDomainHandler(domain string, store es.EventStore, registry *es.Registry,
 }
 
 type PostCommandRequest struct {
-	Name    string          `json:"name"`
+	Name    string          `json:"name" validate:"required,gte=1,lte=100"`
 	Payload json.RawMessage `json:"payload"`
 }
 
@@ -50,7 +50,7 @@ type PostCommandResponse struct {
 
 func (u *DomainHandler) PostCommand(w http.ResponseWriter, r *http.Request) {
 	var req PostCommandRequest
-	if err := web.DecodeBody(r, &req); err != nil {
+	if err := web.DecodeBody(r, &req, true); err != nil {
 		web.JSONError(w, r, err)
 		return
 	}
@@ -74,7 +74,8 @@ func (u *DomainHandler) PostCommand(w http.ResponseWriter, r *http.Request) {
 	commandID, err := u.dispatcher.Dispatch(r.Context(), cmd)
 	if err != nil {
 		if errors.Is(err, es.ErrInvalidCommand) {
-			web.JSONError(w, r, core.ErrBadRequest)
+			ae := core.NewApiError(http.StatusBadRequest, err.Error())
+			web.JSONError(w, r, ae)
 			return
 		}
 		web.JSONError(w, r, err)

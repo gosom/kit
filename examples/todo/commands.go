@@ -12,8 +12,8 @@ var _ es.ICommand = (*CreateTodo)(nil)
 type CreateTodo struct {
 	es.CommandBase
 
-	ID    string `json:"id" aggregateID:"true"`
-	Title string `json:"title"`
+	ID    string `json:"id" aggregateID:"true" validate:"required,uuid"`
+	Title string `json:"title" validate:"required,gte=1,lte=140"`
 }
 
 func (c *CreateTodo) Handle(ctx context.Context, h es.AggregateLoader) ([]es.IEvent, error) {
@@ -47,8 +47,8 @@ func (o *TodoCreated) Apply(aggregate es.AggregateRoot) error {
 type UpdateTodoStatus struct {
 	es.CommandBase
 
-	ID     string `json:"id" aggregateID:"true"`
-	Status string `json:"status"`
+	ID     string `json:"id" aggregateID:"true" validate:"required,uuid"`
+	Status string `json:"status" validate:"required,oneof=open completed"`
 }
 
 func (c *UpdateTodoStatus) Handle(ctx context.Context, h es.AggregateLoader) ([]es.IEvent, error) {

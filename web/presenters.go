@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/go-playground/validator/v10"
 	"github.com/gosom/kit/core"
 )
 
@@ -32,9 +33,13 @@ func JSON(w http.ResponseWriter, r *http.Request, code int, v any) {
 func JSONError(w http.ResponseWriter, r *http.Request, err error) {
 	var resp ErrResponse
 	var e core.ApiError
+	var ve validator.ValidationErrors
 	switch {
 	case errors.As(err, &e):
 		resp.Code, resp.Message = e.ApiError()
+	case errors.As(err, &ve):
+		resp.Code = http.StatusBadRequest
+		resp.Message = ve.Error()
 	default:
 		resp.Code = http.StatusInternalServerError
 		resp.Message = http.StatusText(resp.Code)

@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gosom/kit/core"
 	"github.com/gosom/kit/lib"
 )
 
@@ -78,6 +79,11 @@ func prepareCommand(domain string, ev ICommand) (err error) {
 			err = fmt.Errorf("error preparing command %+v: %v", ev, r)
 		}
 	}()
+
+	if err := core.Validate(ev); err != nil {
+		return fmt.Errorf("%s %w", err, ErrInvalidCommand)
+	}
+
 	if ev.GetID() == "" {
 		ev.SetID(lib.MustNewULID())
 	}
