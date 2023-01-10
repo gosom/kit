@@ -1,7 +1,5 @@
 package kafka
 
-/* This is WIP
-
 import (
 	"context"
 
@@ -10,40 +8,29 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	servers = ""
-	securit = "SASL_SSL"
-	mechani = "PLAIN"
-	usernam = ""
-	passwor = ""
-)
-
 type ConsumerGroup struct {
-	Name    string
-	Brokers []string
-	GroupID string
-	Num     int
-	Worker  es.Worker
-	Topic   string
+	cfg         kafka.ConfigMap
+	topic       string
+	num         int
+	worker      es.Worker
+	commitEvery int
 }
 
-func (o *ConsumerGroup) Start(ctx context.Context) error {
-	cfg := kafka.ConfigMap{
-		"bootstrap.servers":               servers,
-		"security.protocol":               securit,
-		"sasl.mechanisms":                 mechani,
-		"sasl.username":                   usernam,
-		"sasl.password":                   passwor,
-		"group.id":                        o.GroupID,
-		"enable.auto.commit":              false,
-		"go.application.rebalance.enable": true,
-		"auto.offset.reset":               "latest",
-		"api.version.request":             false,
+func NewConsumerGroup(cfg KafkaConfig, topic string, num int, w es.Worker) *ConsumerGroup {
+	ans := ConsumerGroup{
+		cfg:         NewKafkaConfigMap(cfg),
+		topic:       topic,
+		num:         num,
+		worker:      w,
+		commitEvery: 100,
 	}
+	return &ans
+}
 
-	consumers := make([]*Consumer, 0, o.Num)
-	for i := 0; i < o.Num; i++ {
-		c, err := NewConsumer(topic, cfg, o.Worker)
+func (o *ConsumerGroup) Listen(ctx context.Context) error {
+	consumers := make([]*Consumer, 0, o.num)
+	for i := 0; i < o.num; i++ {
+		c, err := NewConsumer(o.topic, o.commitEvery, o.cfg, o.worker)
 		if err != nil {
 			return err
 		}
@@ -57,4 +44,3 @@ func (o *ConsumerGroup) Start(ctx context.Context) error {
 	}
 	return g.Wait()
 }
-*/

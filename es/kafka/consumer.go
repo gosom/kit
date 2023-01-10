@@ -1,7 +1,5 @@
 package kafka
 
-/*  This is WIP
-
 import (
 	"context"
 	"fmt"
@@ -9,21 +7,26 @@ import (
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 	"github.com/gosom/kit/es"
+	"github.com/gosom/kit/logging"
 )
 
 type Consumer struct {
-	topic      string
-	consumer   *kafka.Consumer
-	offsetsMap map[string]kafka.TopicPartition
-	count      int
-	worker     es.Worker
+	log         logging.Logger
+	topic       string
+	consumer    *kafka.Consumer
+	offsetsMap  map[string]kafka.TopicPartition
+	count       int
+	worker      es.Worker
+	commitEvery int
 }
 
-func NewConsumer(topic string, cfg kafka.ConfigMap, w es.Worker) (*Consumer, error) {
+func NewConsumer(topic string, commitEvery int, cfg kafka.ConfigMap, w es.Worker) (*Consumer, error) {
 	ans := Consumer{
-		topic:      topic,
-		offsetsMap: make(map[string]kafka.TopicPartition),
-		worker:     w,
+		log:         logging.Get().With("component", "kafka", "topic", topic),
+		topic:       topic,
+		offsetsMap:  make(map[string]kafka.TopicPartition),
+		worker:      w,
+		commitEvery: commitEvery,
 	}
 	consumer, err := kafka.NewConsumer(&cfg)
 	if err != nil {
@@ -34,33 +37,65 @@ func NewConsumer(topic string, cfg kafka.ConfigMap, w es.Worker) (*Consumer, err
 }
 
 func (o *Consumer) Start(ctx context.Context) error {
+	o.log.Info("Starting consumer")
 	o.consumer.SubscribeTopics([]string{o.topic}, o.rebalanceCb)
 	for {
 		select {
 		case <-ctx.Done():
-			commit(o.consumer, o.offsetsMap)
+			commit(o.consumer, o.offsetsMap, o.log.Error)
 			o.consumer.Close()
 			time.Sleep(2 * time.Second)
-			fmt.Println("Consumer - Done")
+			o.log.Info("Consumer closed")
 			return nil
 		default:
-			msg, err := o.consumer.ReadMessage(100 * time.Millisecond)
-			if err == nil {
-				fmt.Printf("Consumer - Message on %s: %s\n", msg.TopicPartition, string(msg.Value))
+		}
+		msg, err := o.consumer.ReadMessage(100 * time.Millisecond)
+		if err == nil {
+			o.log.Debug("Received message", "key", string(msg.Key), "value", string(msg.Value))
 
-				if err := o.worker.Process(ctx, msg.Key, msg.Value, msg.Timestamp); err != nil {
-					return err
+			// we process the message here
+			if err := o.processMessage(ctx, msg); err != nil {
+				if err == context.Canceled {
+					continue
 				}
+				panic(err)
+			}
 
-				key := fmt.Sprintf("%s[%d]", *msg.TopicPartition.Topic, msg.TopicPartition.Partition)
-				o.offsetsMap[key] = msg.TopicPartition
+			key := fmt.Sprintf("%s[%d]", *msg.TopicPartition.Topic, msg.TopicPartition.Partition)
+			o.offsetsMap[key] = msg.TopicPartition
 
-				o.count++
-				if o.count%10 == 0 {
-					go commit(o.consumer, o.offsetsMap)
-				}
+			o.count++
+			if o.count%o.commitEvery == 0 {
+				o.log.Info("Committing offsets", "offsets", o.offsetsMap)
+				go commit(o.consumer, o.offsetsMap, o.log.Error)
 			}
 		}
+	}
+	return nil
+}
+
+// processMessage is the place where we process the message
+func (o *Consumer) processMessage(ctx context.Context, msg *kafka.Message) error {
+	backoff := 20 * time.Millisecond
+	factor := 2
+	maxWait := 5 * time.Second
+	for {
+		select {
+		case <-ctx.Done():
+			return ctx.Err()
+		default:
+		}
+
+		err := o.worker.Process(ctx, msg.Key, msg.Value, msg.Timestamp)
+		if err == nil {
+			return nil
+		}
+		o.log.Error("Error processing message", "error", err)
+		if backoff > maxWait {
+			backoff = maxWait
+		}
+		time.Sleep(backoff)
+		backoff = backoff * time.Duration(factor)
 	}
 	return nil
 }
@@ -68,39 +103,35 @@ func (o *Consumer) Start(ctx context.Context) error {
 func (o *Consumer) rebalanceCb(consumer *kafka.Consumer, ev kafka.Event) error {
 	switch e := ev.(type) {
 	case kafka.AssignedPartitions:
-		fmt.Println("Rebalance - Assigned:", e.Partitions)
+		o.log.Info("RebalanceCb - AssignedPartitions", "partitions", e.Partitions)
 
-		// Reset the state
 		o.count = 0
 		o.offsetsMap = make(map[string]kafka.TopicPartition)
 
-		// Assign partition
 		consumer.Assign(e.Partitions)
 	case kafka.RevokedPartitions:
-		fmt.Println("Rebalance - Revoked:", e.Partitions)
-		// Commit the current offset synchronously before revoked partitions
-		commit(consumer, o.offsetsMap)
+		o.log.Info("RebalanceCb - RevokedPartitions", "partitions", e.Partitions)
+
+		commit(consumer, o.offsetsMap, o.log.Error)
 
 		consumer.Unassign()
 	}
 	return nil
 }
 
-func commit(consumer *kafka.Consumer, offsets map[string]kafka.TopicPartition) {
+func commit(consumer *kafka.Consumer, offsets map[string]kafka.TopicPartition, logFn func(string, ...any)) {
 	if len(offsets) == 0 {
 		return
 	}
 	tps := make([]kafka.TopicPartition, len(offsets))
 	index := 0
 	for _, tp := range offsets {
-		// The committed offset should always be the offset of the next message that your application will read.
 		tp.Offset = tp.Offset + 1
 		tps[index] = tp
 		index++
 	}
 	if _, err := consumer.CommitOffsets(tps); err != nil {
-		fmt.Println("CommitOffsets Error:", err)
+		logFn("Error committing offsets", "error", err)
 		return
 	}
 }
-*/

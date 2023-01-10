@@ -8,6 +8,7 @@ import (
 
 	"github.com/gosom/kit/es"
 	"github.com/gosom/kit/es/eshttp"
+	"github.com/gosom/kit/es/kafka"
 	"github.com/gosom/kit/es/postgres"
 	"github.com/gosom/kit/examples/todo"
 	"github.com/gosom/kit/examples/todo/api"
@@ -55,6 +56,17 @@ func run(ctx context.Context) error {
 		return err
 	}
 
+	kafkaCfg := kafka.KafkaConfig{
+		Servers: "localhost:9092",
+		GroupID: "todo",
+	}
+	kafkaCommandListener := kafka.NewConsumerGroup(
+		kafkaCfg,
+		todo.COMMAND_TOPIC,
+		1,
+		postgres.NewWorker(store),
+	)
+
 	commandProcessor, err := es.NewCommandProcessor(
 		2,
 		store,
@@ -76,6 +88,7 @@ func run(ctx context.Context) error {
 		es.WithCommandProcessor(commandProcessor),
 		es.WithWebServer(webServer),
 		es.WithPublishers(projectionBuilder),
+		es.WithCommandBusListener(kafkaCommandListener),
 	)
 	if err != nil {
 		return err

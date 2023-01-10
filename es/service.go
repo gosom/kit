@@ -13,9 +13,10 @@ type option func(*appService) error
 type appService struct {
 	log logging.Logger
 
-	store            EventStore
-	webServer        WebServer
-	commandProcessor CommandProcessor
+	store              EventStore
+	webServer          WebServer
+	commandProcessor   CommandProcessor
+	commandBusListener CommandBusListener
 
 	subscribers []Subscriber
 }
@@ -40,6 +41,11 @@ func (a *appService) Start(ctx context.Context) error {
 	if a.webServer != nil {
 		g.Go(func() error {
 			return a.webServer.ListenAndServe(ctx)
+		})
+	}
+	if a.commandBusListener != nil {
+		g.Go(func() error {
+			return a.commandBusListener.Listen(ctx)
 		})
 	}
 	return g.Wait()
@@ -98,6 +104,13 @@ func WithPublishers(publisher ...Publisher) option {
 			}
 			a.subscribers = append(a.subscribers, sub)
 		}
+		return nil
+	}
+}
+
+func WithCommandBusListener(listener CommandBusListener) option {
+	return func(a *appService) error {
+		a.commandBusListener = listener
 		return nil
 	}
 }
