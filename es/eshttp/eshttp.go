@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 
 	"github.com/gosom/kit/core"
@@ -12,8 +13,8 @@ import (
 	"github.com/gosom/kit/web"
 )
 
-func RegisterDomainRoutes(domain string, mux web.Router, store es.EventStore, registry *es.Registry, aggFactory es.AggregateFactory, dispatcher es.CommandDispatcher) {
-	handler := NewDomainHandler(domain, store, registry, aggFactory, dispatcher)
+func RegisterDomainRoutes(domain string, mux web.Router, store es.EventStore, registry *es.Registry, aggFactory es.AggregateFactory) {
+	handler := NewDomainHandler(domain, store, registry, aggFactory)
 	mux.MethodFunc(http.MethodGet, fmt.Sprintf("/%s/commands/{commandId}", handler.domain), handler.GetCommand)
 	mux.MethodFunc(http.MethodPost, fmt.Sprintf("/%s/commands", handler.domain), handler.PostCommand)
 	mux.MethodFunc(http.MethodGet, fmt.Sprintf("/%s/events/{aggregateId}", handler.domain), handler.GetEvents)
@@ -25,63 +26,46 @@ type DomainHandler struct {
 	store      es.EventStore
 	registry   *es.Registry
 	aggFactory es.AggregateFactory
-	dispatcher es.CommandDispatcher
 }
 
-func NewDomainHandler(domain string, store es.EventStore, registry *es.Registry, aggFactory es.AggregateFactory,
-	dispatcher es.CommandDispatcher) *DomainHandler {
+func NewDomainHandler(domain string, store es.EventStore, registry *es.Registry, aggFactory es.AggregateFactory) *DomainHandler {
 	return &DomainHandler{
 		domain:     domain,
 		store:      store,
 		registry:   registry,
 		aggFactory: aggFactory,
-		dispatcher: dispatcher,
 	}
-}
-
-type PostCommandRequest struct {
-	Name    string          `json:"name" validate:"required,gte=1,lte=100"`
-	Payload json.RawMessage `json:"payload"`
 }
 
 type PostCommandResponse struct {
 	ID string `json:"id"`
 }
 
-func (u *DomainHandler) PostCommand(w http.ResponseWriter, r *http.Request) {
-	var req PostCommandRequest
-	if err := web.DecodeBody(r, &req, true); err != nil {
-		web.JSONError(w, r, err)
-		return
-	}
-	conv, ok := u.registry.GetCommand(req.Name)
-	if !ok {
-		fmt.Println("command not found")
-		web.JSONError(w, r, core.ErrBadRequest)
-		return
-	}
-	cr := es.CommandRecord{
-		RecordBase: es.RecordBase{
-			Data:      req.Payload,
-			EventType: req.Name,
-		},
-	}
-	cmd, err := conv(cr)
-	if err != nil {
-		web.JSONError(w, r, err)
-		return
-	}
-	commandID, err := u.dispatcher.Dispatch(r.Context(), cmd)
+func (a *DomainHandler) PostCommand(w http.ResponseWriter, r *http.Request) {
+	command, err := es.ParseCommandRequest(a.registry, io.Reader(r.Body))
 	if err != nil {
 		if errors.Is(err, es.ErrInvalidCommand) {
-			ae := core.NewApiError(http.StatusBadRequest, err.Error())
-			web.JSONError(w, r, ae)
+			web.JSONError(w, r, core.ErrBadRequest)
 			return
 		}
 		web.JSONError(w, r, err)
 		return
 	}
-	web.JSON(w, r, http.StatusOK, PostCommandResponse{ID: commandID})
+	cr, err := es.CommandToCommandRecord(a.domain, command)
+	if err != nil {
+		web.JSONError(w, r, err)
+		return
+	}
+	commandID, err := a.store.SaveCommandRecords(r.Context(), cr)
+	if err != nil {
+		web.JSONError(w, r, err)
+		return
+	}
+	if len(commandID) == 0 {
+		web.JSONError(w, r, core.ErrInternal)
+		return
+	}
+	web.JSON(w, r, http.StatusOK, PostCommandResponse{ID: commandID[0]})
 }
 
 type GetCommandResponse es.CommandRecord

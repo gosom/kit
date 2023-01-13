@@ -48,14 +48,15 @@ func NewCommandProcessor(
 func (c *commandProcessor) Start(ctx context.Context) error {
 	c.log.Info("starting command processor")
 	defer c.log.Info("command processor stopped")
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(300 * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return nil
 		case <-ticker.C:
-			if err := c.work(ctx); err != nil {
+			_, err := c.work(ctx, 100)
+			if err != nil {
 				c.log.Error("failed to process commands", "error", err)
 			}
 		}
@@ -73,7 +74,7 @@ func (c *commandProcessor) Load(ctx context.Context, aggregateID string, aggrega
 		if !ok {
 			return err
 		}
-		events[i], err = convFn(records[i])
+		events[i], err = convFn(records[i].Data)
 	}
 	if err := Load(aggregate, events); err != nil {
 		return err
@@ -81,11 +82,11 @@ func (c *commandProcessor) Load(ctx context.Context, aggregateID string, aggrega
 	return nil
 }
 
-func (c *commandProcessor) work(ctx context.Context) error {
+func (c *commandProcessor) work(ctx context.Context, limit int) (int, error) {
 	t0 := time.Now()
-	items, err := c.store.SelectForProcessing(ctx, c.workerNum, 10)
+	items, err := c.store.SelectForProcessing(ctx, c.workerNum, limit)
 	if err != nil {
-		return fmt.Errorf("%w when selecting commands", err)
+		return 0, fmt.Errorf("%w when selecting commands", err)
 	}
 	t1 := time.Now()
 	g, ctx := errgroup.WithContext(ctx)
@@ -100,7 +101,7 @@ func (c *commandProcessor) work(ctx context.Context) error {
 		}
 	}
 	if err := g.Wait(); err != nil {
-		return fmt.Errorf("%w when processing commands", err)
+		return 0, fmt.Errorf("%w when processing commands", err)
 	}
 	t2 := time.Now()
 	speed := float64(total) / t2.Sub(t0).Seconds()
@@ -114,7 +115,7 @@ func (c *commandProcessor) work(ctx context.Context) error {
 			"total", total,
 		)
 	}
-	return nil
+	return total, nil
 }
 
 func (c *commandProcessor) processGroup(ctx context.Context, items []CommandRecord) error {
@@ -148,10 +149,11 @@ func (c *commandProcessor) process(ctx context.Context, rec CommandRecord) (err 
 	}
 	expectedVersion, err := c.store.GetOrCreateVersion(ctx, rec.AggregateID)
 	if err != nil {
+		err = fmt.Errorf("%w when getting version", err)
 		return
 	}
 	var cmd ICommand
-	cmd, err = convFn(rec)
+	cmd, err = convFn(rec.Data)
 	if err != nil {
 		err = fmt.Errorf("rec: %s %w", rec.EventType, err)
 		return
@@ -182,6 +184,9 @@ func (c *commandProcessor) process(ctx context.Context, rec CommandRecord) (err 
 		}
 	}
 	err = c.store.StoreCommandResults(ctx, rec.ID, expectedVersion, events...)
+	if err != nil {
+		err = fmt.Errorf("%w when storing command results", err)
+	}
 
 	return
 }

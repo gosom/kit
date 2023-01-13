@@ -38,8 +38,9 @@ func (o *ConsumerGroup) Listen(ctx context.Context) error {
 	}
 	g, ctx := errgroup.WithContext(ctx)
 	for i := range consumers {
+		consumer := consumers[i]
 		g.Go(func() error {
-			return consumers[i].Start(ctx)
+			return consumer.Start(ctx)
 		})
 	}
 	return g.Wait()

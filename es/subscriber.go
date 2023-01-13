@@ -38,7 +38,7 @@ func NewSubscriber(store EventStore, publisher Publisher, subscription string) (
 func (o *subscriber) Start(ctx context.Context) error {
 	o.log.Info("starting subscriber", "subscription", o.subscription.Group)
 	defer o.log.Info("subscriber stopped", "subscription", o.subscription.Group)
-	ticker := time.NewTicker(1 * time.Second)
+	ticker := time.NewTicker(300 * time.Millisecond)
 	defer ticker.Stop()
 	for {
 		select {
@@ -55,7 +55,7 @@ func (o *subscriber) Start(ctx context.Context) error {
 }
 
 func (o *subscriber) process(ctx context.Context) (int, error) {
-	items, err := o.store.SelectEventsForSubscription(ctx, o.subscription, 100)
+	items, err := o.store.SelectEventsForSubscription(ctx, o.subscription, 500)
 	if err != nil {
 		return 0, fmt.Errorf("%w when selecting events for subscription", err)
 	}

@@ -3,6 +3,7 @@ package kafka
 import (
 	"context"
 	"fmt"
+	"sync"
 	"time"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
@@ -18,6 +19,7 @@ type Consumer struct {
 	count       int
 	worker      es.Worker
 	commitEvery int
+	commitWg    *sync.WaitGroup
 }
 
 func NewConsumer(topic string, commitEvery int, cfg kafka.ConfigMap, w es.Worker) (*Consumer, error) {
@@ -27,6 +29,7 @@ func NewConsumer(topic string, commitEvery int, cfg kafka.ConfigMap, w es.Worker
 		offsetsMap:  make(map[string]kafka.TopicPartition),
 		worker:      w,
 		commitEvery: commitEvery,
+		commitWg:    &sync.WaitGroup{},
 	}
 	consumer, err := kafka.NewConsumer(&cfg)
 	if err != nil {
@@ -39,13 +42,16 @@ func NewConsumer(topic string, commitEvery int, cfg kafka.ConfigMap, w es.Worker
 func (o *Consumer) Start(ctx context.Context) error {
 	o.log.Info("Starting consumer")
 	o.consumer.SubscribeTopics([]string{o.topic}, o.rebalanceCb)
+	defer func() {
+		commit(o.consumer, o.offsetsMap, o.log.Error, o.commitWg)
+		o.commitWg.Wait()
+		time.Sleep(2 * time.Second)
+		o.consumer.Close()
+		o.log.Info("Consumer closed")
+	}()
 	for {
 		select {
 		case <-ctx.Done():
-			commit(o.consumer, o.offsetsMap, o.log.Error)
-			o.consumer.Close()
-			time.Sleep(2 * time.Second)
-			o.log.Info("Consumer closed")
 			return nil
 		default:
 		}
@@ -56,7 +62,8 @@ func (o *Consumer) Start(ctx context.Context) error {
 			// we process the message here
 			if err := o.processMessage(ctx, msg); err != nil {
 				if err == context.Canceled {
-					continue
+					o.log.Info("Context canceled")
+					return nil
 				}
 				panic(err)
 			}
@@ -67,7 +74,7 @@ func (o *Consumer) Start(ctx context.Context) error {
 			o.count++
 			if o.count%o.commitEvery == 0 {
 				o.log.Info("Committing offsets", "offsets", o.offsetsMap)
-				go commit(o.consumer, o.offsetsMap, o.log.Error)
+				commit(o.consumer, o.offsetsMap, o.log.Error, o.commitWg)
 			}
 		}
 	}
@@ -103,23 +110,21 @@ func (o *Consumer) processMessage(ctx context.Context, msg *kafka.Message) error
 func (o *Consumer) rebalanceCb(consumer *kafka.Consumer, ev kafka.Event) error {
 	switch e := ev.(type) {
 	case kafka.AssignedPartitions:
-		o.log.Info("RebalanceCb - AssignedPartitions", "partitions", e.Partitions)
-
 		o.count = 0
 		o.offsetsMap = make(map[string]kafka.TopicPartition)
-
 		consumer.Assign(e.Partitions)
+		o.log.Info("RebalanceCb - AssignedPartitions", "partitions", e.Partitions)
 	case kafka.RevokedPartitions:
-		o.log.Info("RebalanceCb - RevokedPartitions", "partitions", e.Partitions)
-
-		commit(consumer, o.offsetsMap, o.log.Error)
-
+		commit(consumer, o.offsetsMap, o.log.Error, o.commitWg)
 		consumer.Unassign()
+		o.log.Info("RebalanceCb - RevokedPartitions", "partitions", e.Partitions)
 	}
 	return nil
 }
 
-func commit(consumer *kafka.Consumer, offsets map[string]kafka.TopicPartition, logFn func(string, ...any)) {
+func commit(consumer *kafka.Consumer, offsets map[string]kafka.TopicPartition, logFn func(string, ...any), wg *sync.WaitGroup) {
+	wg.Add(1)
+	defer wg.Done()
 	if len(offsets) == 0 {
 		return
 	}

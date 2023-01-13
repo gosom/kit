@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"reflect"
 	"strings"
 	"time"
@@ -139,4 +140,24 @@ func CommandToCommandRecord(domain string, ev ICommand) (CommandRecord, error) {
 		},
 		AggregateHash: ev.GetAggregateHash(),
 	}, nil
+}
+
+type CommandRequest struct {
+	Name    string          `json:"name" validate:"required,gte=1,lte=100"`
+	Payload json.RawMessage `json:"payload"`
+}
+
+func ParseCommandRequest(registry *Registry, r io.Reader) (ICommand, error) {
+	var req CommandRequest
+	if err := json.NewDecoder(r).Decode(&req); err != nil {
+		return nil, fmt.Errorf("%w %s", ErrInvalidCommand, err.Error())
+	}
+	if err := core.Validate(req); err != nil {
+		return nil, fmt.Errorf("%w %s", ErrInvalidCommand, err.Error())
+	}
+	conv, ok := registry.GetCommand(req.Name)
+	if !ok {
+		return nil, fmt.Errorf("%w %s", ErrInvalidCommand, "command not found")
+	}
+	return conv(req.Payload)
 }

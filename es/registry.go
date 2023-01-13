@@ -2,8 +2,8 @@ package es
 
 import "sync"
 
-type ConverterFn func(CommandRecord) (ICommand, error)
-type ConverterEventFn func(EventRecord) (IEvent, error)
+type ConverterFn func([]byte) (ICommand, error)
+type ConverterEventFn func([]byte) (IEvent, error)
 
 type Registry struct {
 	mutex    *sync.RWMutex

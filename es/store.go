@@ -9,6 +9,7 @@ type EventStore interface {
 
 	//SaveCommandRecord saves the command record.
 	SaveCommandRecords(ctx context.Context, records ...CommandRecord) ([]string, error)
+	// GetCommand returns the command record for the given id.
 	GetCommand(ctx context.Context, commandID string) (CommandRecord, error)
 
 	//StoreCommandResults stores the command results.

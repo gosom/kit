@@ -82,7 +82,7 @@ func EventRecordToEvent(registry *Registry, record EventRecord) (IEvent, error) 
 	if !ok {
 		return nil, fmt.Errorf("event type %s not found in registry", record.EventType)
 	}
-	ev, err := convFn(record)
+	ev, err := convFn(record.Data)
 	if err != nil {
 		return nil, err
 	}

@@ -73,6 +73,21 @@ func (e *EventStore) SaveCommandRecords(ctx context.Context, records ...es.Comma
 	return ids, rows.Err()
 }
 
+func (e *EventStore) SaveCommand(ctx context.Context, domain string, cmd es.ICommand) (string, error) {
+	rec, err := es.CommandToCommandRecord(domain, cmd)
+	if err != nil {
+		return "", err
+	}
+	ids, err := e.SaveCommandRecords(ctx, rec)
+	if err != nil {
+		return "", err
+	}
+	if len(ids) == 0 {
+		return "", fmt.Errorf("no command records saved")
+	}
+	return ids[0], nil
+}
+
 func (e *EventStore) GetCommand(ctx context.Context, commandID string) (es.CommandRecord, error) {
 	record, err := sqldb.QueryRow[es.CommandRecord](ctx, e.db.Conn(), getCommandStmt, commandID)
 	return record, err

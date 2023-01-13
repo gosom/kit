@@ -15,6 +15,7 @@ type KafkaConfig struct {
 	RebalanceEnable   bool
 	AutoOffsetReset   string
 	ApiVersionRequest bool
+	Producer          bool
 }
 
 func NewKafkaConfigMap(cfg KafkaConfig) kafka.ConfigMap {
@@ -31,18 +32,24 @@ func NewKafkaConfigMap(cfg KafkaConfig) kafka.ConfigMap {
 		cfg.AutoOffsetReset = "latest"
 	}
 
-	return kafka.ConfigMap{
-		"bootstrap.servers":               cfg.Servers,
-		"security.protocol":               cfg.Security,
-		"sasl.mechanisms":                 cfg.Mechanism,
-		"sasl.username":                   cfg.Username,
-		"sasl.password":                   cfg.Password,
-		"group.id":                        cfg.GroupID,
-		"enable.auto.commit":              false,
-		"go.application.rebalance.enable": true,
-		"auto.offset.reset":               cfg.AutoOffsetReset,
-		"api.version.request":             cfg.ApiVersionRequest,
+	m := kafka.ConfigMap{
+		"bootstrap.servers":   cfg.Servers,
+		"security.protocol":   cfg.Security,
+		"sasl.mechanisms":     cfg.Mechanism,
+		"sasl.username":       cfg.Username,
+		"sasl.password":       cfg.Password,
+		"api.version.request": cfg.ApiVersionRequest,
 	}
+	if cfg.Producer {
+		m.SetKey("enable.idempotence", true)
+	} else {
+		m.SetKey("enable.auto.commit", false)
+		m.SetKey("go.application.rebalance.enable", true)
+		m.SetKey("enable.auto.commit", true)
+		m.SetKey("group.id", cfg.GroupID)
+		m.SetKey("auto.offset.reset", cfg.AutoOffsetReset)
+	}
+	return m
 }
 
 func NewKafkaConfig() (KafkaConfig, error) {

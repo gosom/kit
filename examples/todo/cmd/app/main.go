@@ -60,15 +60,16 @@ func run(ctx context.Context) error {
 		Servers: "localhost:9092",
 		GroupID: "todo",
 	}
+
 	kafkaCommandListener := kafka.NewConsumerGroup(
 		kafkaCfg,
 		todo.COMMAND_TOPIC,
 		1,
-		postgres.NewWorker(store),
+		es.NewSaveCommandWorker(store, registry),
 	)
 
 	commandProcessor, err := es.NewCommandProcessor(
-		2,
+		16,
 		store,
 		registry,
 		todo.DOMAIN,
@@ -77,8 +78,7 @@ func run(ctx context.Context) error {
 		return err
 	}
 
-	dispatcher := postgres.NewCommandDispatcher(todo.DOMAIN, store)
-	webServer := getWebServer(store, registry, dispatcher)
+	webServer := getWebServer(store, registry)
 
 	projectionBuilder := todo.NewProjectionBuilder(db, registry)
 
@@ -103,14 +103,14 @@ func getDb(dsn string) (*sqldb.DB, error) {
 	return dbconn, dbconn.Open()
 }
 
-func getWebServer(store es.EventStore, registry *es.Registry, dispatcher es.CommandDispatcher) *web.HttpServer {
+func getWebServer(store es.EventStore, registry *es.Registry) *web.HttpServer {
 	routerCfg := web.RouterConfig{}
 	mux := web.NewRouter(routerCfg)
 	mux.Get("/health", func(w http.ResponseWriter, r *http.Request) {
 		web.JSON(w, r, http.StatusOK, map[string]string{"status": "ok"})
 	})
 
-	eshttp.RegisterDomainRoutes(todo.DOMAIN, mux, store, registry, todo.NewTodoAggregate, dispatcher)
+	eshttp.RegisterDomainRoutes(todo.DOMAIN, mux, store, registry, todo.NewTodoAggregate)
 
 	api.RegisterHandlers(mux)
 
