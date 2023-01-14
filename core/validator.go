@@ -34,10 +34,6 @@ func SetValidator(validators ...RegisterValidator) {
 	})
 }
 
-func NewValidator(validators ...RegisterValidator) *validator.Validate {
-	return validate
-}
-
 func Validate(v interface{}, skipFields ...string) error {
 	SetValidator()
 	return validate.StructExcept(v, skipFields...)
