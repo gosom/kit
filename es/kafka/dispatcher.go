@@ -6,8 +6,8 @@ import (
 	"fmt"
 
 	"github.com/confluentinc/confluent-kafka-go/kafka"
-	"github.com/gosom/kit/core"
 	"github.com/gosom/kit/es"
+	"github.com/gosom/kit/lib"
 	"github.com/gosom/kit/logging"
 )
 
@@ -37,7 +37,7 @@ func NewDispatcher(cfg kafka.ConfigMap, ack bool, topic, domain string, registry
 }
 
 func (d *Dispatcher) DispatchCommandRequest(ctx context.Context, request es.CommandRequest) (string, error) {
-	if err := core.Validate(request); err != nil {
+	if err := lib.Validate(request); err != nil {
 		return "", fmt.Errorf("%w %s", es.ErrInvalidCommand, err.Error())
 	}
 	r := bytes.NewReader(request.Payload)

@@ -6,7 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/gosom/kit/core"
+	"github.com/gosom/kit/lib"
 )
 
 // ErrResponse is the response body for an error.
@@ -32,7 +32,7 @@ func JSON(w http.ResponseWriter, r *http.Request, code int, v any) {
 // JSONError writes the given error to the response as JSON.
 func JSONError(w http.ResponseWriter, r *http.Request, err error) {
 	var resp ErrResponse
-	var e core.ApiError
+	var e lib.ApiError
 	var ve validator.ValidationErrors
 	switch {
 	case errors.As(err, &e):
@@ -46,6 +46,6 @@ func JSONError(w http.ResponseWriter, r *http.Request, err error) {
 	}
 	// I don't like that. Is there any better way to pass the context
 	// to the middleware?
-	*r = *r.WithContext(core.NewContextWithErr(r.Context(), err))
+	*r = *r.WithContext(lib.NewContextWithErr(r.Context(), err))
 	JSON(w, r, resp.Code, resp)
 }

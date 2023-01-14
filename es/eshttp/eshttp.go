@@ -8,8 +8,8 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/gosom/kit/core"
 	"github.com/gosom/kit/es"
+	"github.com/gosom/kit/lib"
 	"github.com/gosom/kit/web"
 )
 
@@ -45,7 +45,7 @@ func (a *DomainHandler) PostCommand(w http.ResponseWriter, r *http.Request) {
 	command, err := es.ParseCommandRequest(a.registry, io.Reader(r.Body))
 	if err != nil {
 		if errors.Is(err, es.ErrInvalidCommand) {
-			web.JSONError(w, r, core.ErrBadRequest)
+			web.JSONError(w, r, lib.ErrBadRequest)
 			return
 		}
 		web.JSONError(w, r, err)
@@ -62,7 +62,7 @@ func (a *DomainHandler) PostCommand(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(commandID) == 0 {
-		web.JSONError(w, r, core.ErrInternal)
+		web.JSONError(w, r, lib.ErrInternal)
 		return
 	}
 	web.JSON(w, r, http.StatusOK, PostCommandResponse{ID: commandID[0]})
@@ -89,13 +89,13 @@ func (u GetCommandResponse) MarshalJSON() ([]byte, error) {
 func (a *DomainHandler) GetCommand(w http.ResponseWriter, r *http.Request) {
 	commandId := web.StringURLParam(r, "commandId")
 	if len(commandId) == 0 {
-		web.JSONError(w, r, core.ErrBadRequest)
+		web.JSONError(w, r, lib.ErrBadRequest)
 		return
 	}
 	command, err := a.store.GetCommand(r.Context(), commandId)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			web.JSONError(w, r, core.ErrNotFound)
+			web.JSONError(w, r, lib.ErrNotFound)
 			return
 		}
 		web.JSONError(w, r, err)
@@ -125,7 +125,7 @@ func (u GetEventResponse) MarshalJSON() ([]byte, error) {
 func (a *DomainHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 	aggregateId := web.StringURLParam(r, "aggregateId")
 	if len(aggregateId) == 0 {
-		web.JSONError(w, r, core.ErrBadRequest)
+		web.JSONError(w, r, lib.ErrBadRequest)
 		return
 	}
 	events, err := a.store.LoadEvents(r.Context(), aggregateId)
@@ -143,7 +143,7 @@ func (a *DomainHandler) GetEvents(w http.ResponseWriter, r *http.Request) {
 func (a *DomainHandler) GetAggregate(w http.ResponseWriter, r *http.Request) {
 	aggregateId := web.StringURLParam(r, "aggregateId")
 	if len(aggregateId) == 0 {
-		web.JSONError(w, r, core.ErrBadRequest)
+		web.JSONError(w, r, lib.ErrBadRequest)
 		return
 	}
 	records, err := a.store.LoadEvents(r.Context(), aggregateId)
@@ -152,7 +152,7 @@ func (a *DomainHandler) GetAggregate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if len(records) == 0 {
-		web.JSONError(w, r, core.ErrNotFound)
+		web.JSONError(w, r, lib.ErrNotFound)
 		return
 	}
 	events, err := es.EventRecordsToEvents(a.registry, records)

@@ -8,7 +8,7 @@ import (
 	"runtime/debug"
 	"time"
 
-	"github.com/gosom/kit/core"
+	"github.com/gosom/kit/lib"
 	"github.com/gosom/kit/logging"
 	"github.com/realclientip/realclientip-go"
 	"github.com/rs/cors"
@@ -31,14 +31,14 @@ func NewCors(opts CorsConfig) *cors.Cors {
 }
 
 // Timeout is a middleware that sets a timeout on the request context.
-func RequestLogger(report core.ErrorReporter) func(http.Handler) http.Handler {
+func RequestLogger(report lib.ErrorReporter) func(http.Handler) http.Handler {
 	log := logging.Get()
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			start := TimeProvider()
 			reqID := RequestIDProvider()
 			ctxLogger := log.With("request_id", reqID)
-			r = r.WithContext(core.NewContextWithRequestID(r.Context(), reqID))
+			r = r.WithContext(lib.NewContextWithRequestID(r.Context(), reqID))
 			r = r.WithContext(logging.NewContext(r.Context(), ctxLogger))
 			lrw := &logResponseWriter{ResponseWriter: w, status: http.StatusOK}
 			defer func() {
@@ -55,12 +55,12 @@ func RequestLogger(report core.ErrorReporter) func(http.Handler) http.Handler {
 					"method", r.Method,
 					"path", r.URL.Path,
 					"query", r.URL.RawQuery,
-					"ip", core.IPFromContext(r.Context()),
+					"ip", lib.IPFromContext(r.Context()),
 					"user-agent", r.UserAgent(),
 					"latency", TimeProvider().Sub(start),
 				}
 				if lrw.status >= http.StatusInternalServerError {
-					err := core.ErrorFromContext(r.Context())
+					err := lib.ErrorFromContext(r.Context())
 					if err != nil {
 						fields = append(fields, "error", err)
 					}
@@ -92,9 +92,9 @@ func Recover(next http.Handler) http.Handler {
 			if rec := recover(); rec != nil {
 				switch err := rec.(type) {
 				case error:
-					JSONError(w, r, core.WrapErrorWithStack(err, debug.Stack()))
+					JSONError(w, r, lib.WrapErrorWithStack(err, debug.Stack()))
 				default:
-					toErr := core.WrapErrorWithStack(fmt.Errorf("%v", err), debug.Stack())
+					toErr := lib.WrapErrorWithStack(fmt.Errorf("%v", err), debug.Stack())
 					JSONError(w, r, toErr)
 				}
 			}
@@ -111,16 +111,16 @@ func RealIP(strat realclientip.Strategy) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			clientIP := strat.ClientIP(r.Header, r.RemoteAddr)
 			if clientIP == "" {
-				err := core.WrapError(
+				err := lib.WrapError(
 					errors.New("Could not determine client ip"),
-					core.ErrBadRequest,
+					lib.ErrBadRequest,
 				)
 				JSONError(w, r, err)
 				return
 			}
 			// I don't like that. Is there any better way to pass the context
 			// to the middleware?
-			*r = *r.WithContext(core.NewContextWithClientIP(r.Context(), clientIP))
+			*r = *r.WithContext(lib.NewContextWithClientIP(r.Context(), clientIP))
 			next.ServeHTTP(w, r)
 		})
 	}

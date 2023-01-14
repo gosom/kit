@@ -1,4 +1,4 @@
-package core
+package lib
 
 type User interface {
 	GetID() string

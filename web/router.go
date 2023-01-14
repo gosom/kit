@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/gosom/kit/core"
+	"github.com/gosom/kit/lib"
 	"github.com/realclientip/realclientip-go"
 
 	"github.com/go-chi/chi/v5"
@@ -34,8 +34,8 @@ type RouterConfig struct {
 	CorsCfg CorsConfig
 
 	// ErrorReporter is the error reporter to be used to report errors
-	// By default, it uses the default error reporter (core.StubErrorReporter)
-	ErrorReporter core.ErrorReporter
+	// By default, it uses the default error reporter (lib.StubErrorReporter)
+	ErrorReporter lib.ErrorReporter
 }
 
 func NewRouter(cfg RouterConfig) (r Router) {
@@ -48,9 +48,9 @@ func NewRouter(cfg RouterConfig) (r Router) {
 		ipStrategy = cfg.RealIPStrategy
 	}
 	if !cfg.NotUseDefaultMiddlewares {
-		var reporter core.ErrorReporter
+		var reporter lib.ErrorReporter
 		if cfg.ErrorReporter == nil {
-			reporter = &core.StubErrorReporter{}
+			reporter = &lib.StubErrorReporter{}
 		} else {
 			reporter = cfg.ErrorReporter
 		}
@@ -82,9 +82,9 @@ func NewRouter(cfg RouterConfig) (r Router) {
 }
 
 func defaultNotFoundHandler(w http.ResponseWriter, r *http.Request) {
-	JSONError(w, r, core.ErrNotFound)
+	JSONError(w, r, lib.ErrNotFound)
 }
 
 func defaultMethdoNotAllowed(w http.ResponseWriter, r *http.Request) {
-	JSONError(w, r, core.ErrMethodNotAllowed)
+	JSONError(w, r, lib.ErrMethodNotAllowed)
 }

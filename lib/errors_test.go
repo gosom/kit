@@ -1,10 +1,10 @@
-package core_test
+package lib_test
 
 import (
 	"errors"
 	"testing"
 
-	"github.com/gosom/kit/core"
+	"github.com/gosom/kit/lib"
 
 	"github.com/stretchr/testify/require"
 )
@@ -12,7 +12,7 @@ import (
 func TestNewApiError(t *testing.T) {
 	t.Run("TestThatNewApiErrorReturnsErrorWithStatusAndMessage", func(t *testing.T) {
 		want := "foo"
-		ae := core.NewApiError(400, want)
+		ae := lib.NewApiError(400, want)
 		require.Equal(t, want, ae.Error())
 		code, message := ae.ApiError()
 		require.Equal(t, 400, code)
@@ -22,10 +22,10 @@ func TestNewApiError(t *testing.T) {
 
 func TestWrapError(t *testing.T) {
 	t.Run("TestThatWrapErrorReturnsErrorWithStatusAndMessage", func(t *testing.T) {
-		ae := core.NewApiError(400, "foo")
+		ae := lib.NewApiError(400, "foo")
 		err := errors.New("bar")
-		we := core.WrapError(err, ae)
+		we := lib.WrapError(err, ae)
 		require.Equal(t, "bar", we.Error())
-		require.Implements(t, (*core.ApiError)(nil), we)
+		require.Implements(t, (*lib.ApiError)(nil), we)
 	})
 }

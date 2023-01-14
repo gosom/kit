@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gosom/kit/core"
 	"github.com/gosom/kit/lib"
 )
 
@@ -81,7 +80,7 @@ func prepareCommand(domain string, ev ICommand) (err error) {
 		}
 	}()
 
-	if err := core.Validate(ev); err != nil {
+	if err := lib.Validate(ev); err != nil {
 		return fmt.Errorf("%s %w", err, ErrInvalidCommand)
 	}
 
@@ -152,7 +151,7 @@ func ParseCommandRequest(registry *Registry, r io.Reader) (ICommand, error) {
 	if err := json.NewDecoder(r).Decode(&req); err != nil {
 		return nil, fmt.Errorf("%w %s", ErrInvalidCommand, err.Error())
 	}
-	if err := core.Validate(req); err != nil {
+	if err := lib.Validate(req); err != nil {
 		return nil, fmt.Errorf("%w %s", ErrInvalidCommand, err.Error())
 	}
 	conv, ok := registry.GetCommand(req.Name)

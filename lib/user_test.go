@@ -1,8 +1,8 @@
-package core_test
+package lib_test
 
-import "github.com/gosom/kit/core"
+import "github.com/gosom/kit/lib"
 
-var _ core.User = &User{}
+var _ lib.User = &User{}
 
 type User struct {
 	IDFn    func() string

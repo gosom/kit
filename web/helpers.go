@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/gosom/kit/core"
+	"github.com/gosom/kit/lib"
 	"github.com/rs/xid"
 )
 
@@ -50,7 +50,7 @@ func DecodeBody(r *http.Request, v interface{}, validate bool) error {
 	}
 	switch {
 	case validate:
-		return core.Validate(v)
+		return lib.Validate(v)
 	default:
 		return nil
 	}

@@ -3,7 +3,7 @@ package rollbar
 import (
 	"context"
 
-	"github.com/gosom/kit/core"
+	"github.com/gosom/kit/lib"
 	"github.com/rollbar/rollbar-go"
 )
 
@@ -31,15 +31,15 @@ func NewRollbarErrorReporter(token, environment, codeVersion, serverHost, server
 func (r rollbarErrorReporter) ReportError(ctx context.Context, args ...any) {
 	var reportArgs []any
 	custom := map[string]any{}
-	requestID := core.RequestIDFromContext(ctx)
+	requestID := lib.RequestIDFromContext(ctx)
 	if len(requestID) > 0 {
 		custom["request_id"] = requestID
 	}
-	requestIP := core.IPFromContext(ctx)
+	requestIP := lib.IPFromContext(ctx)
 	if requestIP != "" {
 		custom["request_ip"] = requestIP
 	}
-	user := core.UserFromContext(ctx)
+	user := lib.UserFromContext(ctx)
 	if user != nil {
 		ctx := rollbar.NewPersonContext(
 			ctx,
@@ -53,7 +53,7 @@ func (r rollbarErrorReporter) ReportError(ctx context.Context, args ...any) {
 		switch v := arg.(type) {
 		case error:
 			reportArgs = append(reportArgs, v)
-			if st, ok := v.(core.StackTracer); ok {
+			if st, ok := v.(lib.StackTracer); ok {
 				custom["stacktrace"] = st.StackTrace()
 			}
 		default:

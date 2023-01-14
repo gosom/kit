@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/gosom/kit/core"
 	"github.com/gosom/kit/es"
 	"github.com/gosom/kit/es/kafka"
 	"github.com/gosom/kit/examples/todo"
+	"github.com/gosom/kit/lib"
 )
 
 func main() {
@@ -34,7 +34,7 @@ func main() {
 
 	for i := 0; i < 10000; i++ {
 		newTodoCmd := todo.CreateTodo{
-			ID:    core.NewUUID(),
+			ID:    lib.NewUUID(),
 			Title: fmt.Sprintf("My %d todo", i),
 		}
 		ctx := context.Background()
