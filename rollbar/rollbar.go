@@ -7,6 +7,8 @@ import (
 	"github.com/rollbar/rollbar-go"
 )
 
+var _ lib.ErrorReporter = &rollbarErrorReporter{}
+
 type rollbarErrorReporter struct {
 }
 

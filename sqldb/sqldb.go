@@ -49,6 +49,11 @@ func NewDB(driver, dsn string) *DB {
 	return &ans
 }
 
+// SetPool sets the database pool.
+func (o *DB) SetPool(pool *sql.DB) {
+	o.pool = pool
+}
+
 // Open opens the database connection.
 func (o *DB) Open() (err error) {
 	if o.DriverName == "" {

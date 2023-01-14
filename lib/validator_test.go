@@ -4,8 +4,9 @@ import (
 	"testing"
 
 	"github.com/go-playground/validator/v10"
-	"github.com/gosom/kit/lib"
 	"github.com/stretchr/testify/require"
+
+	"github.com/gosom/kit/lib"
 )
 
 func TestValidator(t *testing.T) {
