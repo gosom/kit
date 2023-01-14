@@ -57,19 +57,20 @@ func run(ctx context.Context) error {
 	}
 
 	kafkaCfg := kafka.KafkaConfig{
-		Servers: "localhost:9092",
-		GroupID: "todo",
+		Servers:         "localhost:9092",
+		GroupID:         "todo",
+		AutoOffsetReset: "earliest",
 	}
 
 	kafkaCommandListener := kafka.NewConsumerGroup(
 		kafkaCfg,
 		todo.COMMAND_TOPIC,
-		1,
+		2,
 		es.NewSaveCommandWorker(store, registry),
 	)
 
 	commandProcessor, err := es.NewCommandProcessor(
-		16,
+		4,
 		store,
 		registry,
 		todo.DOMAIN,

@@ -22,7 +22,7 @@ func main() {
 	cfgMap := kafka.NewKafkaConfigMap(kafkaCfg)
 	dispatcher, err := kafka.NewDispatcher(
 		cfgMap,
-		true,
+		false,
 		todo.COMMAND_TOPIC,
 		todo.DOMAIN,
 		registry,

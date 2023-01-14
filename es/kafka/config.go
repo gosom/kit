@@ -45,7 +45,7 @@ func NewKafkaConfigMap(cfg KafkaConfig) kafka.ConfigMap {
 	} else {
 		m.SetKey("enable.auto.commit", false)
 		m.SetKey("go.application.rebalance.enable", true)
-		m.SetKey("enable.auto.commit", true)
+		m.SetKey("enable.auto.commit", false)
 		m.SetKey("group.id", cfg.GroupID)
 		m.SetKey("auto.offset.reset", cfg.AutoOffsetReset)
 	}

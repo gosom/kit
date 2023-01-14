@@ -52,6 +52,7 @@ func (o *Consumer) Start(ctx context.Context) error {
 	for {
 		select {
 		case <-ctx.Done():
+			go commit(o.consumer, o.offsetsMap, o.log.Error, o.commitWg)
 			return nil
 		default:
 		}
@@ -67,14 +68,14 @@ func (o *Consumer) Start(ctx context.Context) error {
 				}
 				panic(err)
 			}
+			fmt.Println(msg.TopicPartition.Offset)
 
 			key := fmt.Sprintf("%s[%d]", *msg.TopicPartition.Topic, msg.TopicPartition.Partition)
 			o.offsetsMap[key] = msg.TopicPartition
 
 			o.count++
 			if o.count%o.commitEvery == 0 {
-				o.log.Info("Committing offsets", "offsets", o.offsetsMap)
-				commit(o.consumer, o.offsetsMap, o.log.Error, o.commitWg)
+				go commit(o.consumer, o.offsetsMap, o.log.Error, o.commitWg)
 			}
 		}
 	}
@@ -82,29 +83,36 @@ func (o *Consumer) Start(ctx context.Context) error {
 }
 
 // processMessage is the place where we process the message
-func (o *Consumer) processMessage(ctx context.Context, msg *kafka.Message) error {
+func (o *Consumer) processMessage(ctx context.Context, msg *kafka.Message) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic: %v", r)
+		}
+	}()
 	backoff := 20 * time.Millisecond
 	factor := 2
 	maxWait := 5 * time.Second
 	for {
+		err = o.worker.Process(ctx, msg.Key, msg.Value, msg.Timestamp)
+		//err = fmt.Errorf("artificial error")
+		if err == nil {
+			return
+		}
+		o.log.Error("Error processing message", "error", err, "func", "processMessage")
 		select {
 		case <-ctx.Done():
+			o.log.Info("Context canceled", "func", "processMessage")
 			return ctx.Err()
 		default:
+			if backoff > maxWait {
+				backoff = maxWait
+			}
+			o.log.Info("Retrying in", "backoff", backoff, "func", "processMessage")
+			time.Sleep(backoff)
+			backoff = backoff * time.Duration(factor)
 		}
-
-		err := o.worker.Process(ctx, msg.Key, msg.Value, msg.Timestamp)
-		if err == nil {
-			return nil
-		}
-		o.log.Error("Error processing message", "error", err)
-		if backoff > maxWait {
-			backoff = maxWait
-		}
-		time.Sleep(backoff)
-		backoff = backoff * time.Duration(factor)
 	}
-	return nil
+	return
 }
 
 func (o *Consumer) rebalanceCb(consumer *kafka.Consumer, ev kafka.Event) error {
@@ -139,4 +147,5 @@ func commit(consumer *kafka.Consumer, offsets map[string]kafka.TopicPartition, l
 		logFn("Error committing offsets", "error", err)
 		return
 	}
+	logFn("Offsets committed", "offsets", tps)
 }

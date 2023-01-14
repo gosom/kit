@@ -22,7 +22,7 @@ func NewConsumerGroup(cfg KafkaConfig, topic string, num int, w es.Worker) *Cons
 		topic:       topic,
 		num:         num,
 		worker:      w,
-		commitEvery: 100,
+		commitEvery: 10,
 	}
 	return &ans
 }
