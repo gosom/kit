@@ -1,11 +1,14 @@
 package web_test
 
 import (
+	"bytes"
 	"net/http"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/gosom/kit/logging"
 	"github.com/gosom/kit/web"
 	"github.com/stretchr/testify/require"
 )
@@ -55,4 +58,28 @@ func TestDecodeBody(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "bar", data.Foo)
 	})
+}
+
+func TestStringUrlParam(t *testing.T) {
+	var b bytes.Buffer
+	b.Reset()
+	defaultLogger := logging.Get()
+	defer func() {
+		logging.SetDefault(defaultLogger)
+	}()
+	logger := logging.New("zerolog", logging.DEBUG, &b)
+	logging.SetDefault(logger)
+	r := web.NewRouter(web.RouterConfig{})
+	r.Get("/{id}", func(w http.ResponseWriter, r *http.Request) {
+		id := web.StringURLParam(r, "id")
+		require.Equal(t, "123", id)
+	})
+
+	req := httptest.NewRequest("GET", "/123", nil)
+	w := httptest.NewRecorder()
+
+	r.ServeHTTP(w, req)
+
+	require.Equal(t, 200, w.Code)
+
 }
