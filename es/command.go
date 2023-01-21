@@ -37,6 +37,9 @@ func (e *CommandBase) Validate() error {
 	if len(e.id) == 0 {
 		return fmt.Errorf("Command ID is required %w", ErrInvalidCommand)
 	}
+	if len(e.eventType) == 0 {
+		return fmt.Errorf("Command Event Type is required %w", ErrInvalidCommand)
+	}
 	if len(e.aggregateID) == 0 {
 		return fmt.Errorf("Command AggregateID is required %w", ErrInvalidCommand)
 	}
@@ -47,9 +50,6 @@ func (e *CommandBase) Validate() error {
 
 	if e.aggregateHash == 0 {
 		return fmt.Errorf("Command AggregateHash is required %w", ErrInvalidCommand)
-	}
-	if len(e.eventType) == 0 {
-		return fmt.Errorf("Command Event Type is required %w", ErrInvalidCommand)
 	}
 	return nil
 }
