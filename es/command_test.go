@@ -148,6 +148,19 @@ func TestCommandToCommandRecord(t *testing.T) {
 		require.Equal(t, "dummyCommand", cr.EventType)
 		require.Greater(t, cr.AggregateHash, int32(0))
 		require.Greater(t, cb.GetAggregateHash(), int32(0))
+
+		require.JSONEq(t, `{"id": "8f6ee4b0-9970-11ed-918c-4b15b2f0ca00","title":"test"}`, string(cr.Data))
+
+		params := cr.Bind()
+		require.IsType(t, []any{}, params)
+		require.Len(t, params, 7)
+		require.Equal(t, &cr.ID, params[0])
+		require.Equal(t, &cr.AggregateID, params[1])
+		require.Equal(t, &cr.EventType, params[2])
+		require.Equal(t, &cr.Data, params[3])
+		require.Equal(t, &cr.CreatedAt, params[4])
+		require.Equal(t, &cr.AggregateHash, params[5])
+		require.Equal(t, &cr.Status, params[6])
 	})
 	t.Run("Test with problematic Command", func(t *testing.T) {
 		cb := problematicCommand{}
@@ -159,4 +172,7 @@ func TestCommandToCommandRecord(t *testing.T) {
 		require.ErrorContains(t, err, "aggregateID field must be of type string, int or uint")
 
 	})
+}
+
+func TestParseCommandRequest(t *testing.T) {
 }
