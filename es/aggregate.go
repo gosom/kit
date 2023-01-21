@@ -82,6 +82,12 @@ func RaiseEvent(agg AggregateRoot, event IEvent) error {
 	if agg == nil {
 		return ErrNilAggregate
 	}
+	if event == nil {
+		return ErrInvalidEvent
+	}
+	if int(agg.GetVersion()) >= event.GetVersion() {
+		return fmt.Errorf("event version %d is not greater than aggregate version %d: %w", event.GetVersion(), agg.GetVersion(), ErrDuplicateEvent)
+	}
 	if err := event.Apply(agg); err != nil {
 		return err
 	}

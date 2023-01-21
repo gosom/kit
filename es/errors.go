@@ -15,6 +15,7 @@ var (
 	ErrUnknownSubscriberType       = errors.New("unknown subscriber type")
 
 	ErrInvalidEvent      = errors.New("invalid event")
+	ErrDuplicateEvent    = errors.New("duplicate event")
 	ErrUnregisteredEvent = errors.New("unregistered event")
 
 	ErrSkipEvent        = errors.New("skip event")
