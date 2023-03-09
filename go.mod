@@ -28,6 +28,7 @@ require (
 	github.com/go-playground/universal-translator v0.18.0 // indirect
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
+	github.com/ismurov/swaggerui v0.2.0 // indirect
 	github.com/leodido/go-urn v1.2.1 // indirect
 	github.com/lib/pq v1.10.0 // indirect
 	github.com/mattn/go-colorable v0.1.12 // indirect

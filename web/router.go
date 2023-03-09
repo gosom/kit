@@ -2,6 +2,7 @@ package web
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gosom/kit/lib"
@@ -36,8 +37,13 @@ type RouterConfig struct {
 	// ErrorReporter is the error reporter to be used to report errors
 	// By default, it uses the default error reporter (lib.StubErrorReporter)
 	ErrorReporter lib.ErrorReporter
+
+	// SwaggerUI
+	SwaggerUI *SwaggerUIConfig
 }
 
+// NewRouter creates a new router with the given config
+// It panics if the config is invalid
 func NewRouter(cfg RouterConfig) (r Router) {
 	r = chi.NewRouter()
 	var ipStrategy realclientip.Strategy
@@ -77,6 +83,18 @@ func NewRouter(cfg RouterConfig) (r Router) {
 		r.MethodNotAllowed(cfg.NotAllowedHandler)
 	default:
 		r.MethodNotAllowed(defaultMethdoNotAllowed)
+	}
+	if cfg.SwaggerUI != nil {
+		h, err := NewSwaggerUI(cfg.SwaggerUI)
+		if err != nil {
+			panic(err)
+		}
+		sp := cfg.SwaggerUI.Path
+		if !strings.HasSuffix(sp, "/") {
+			sp += "/"
+		}
+		sp += "*"
+		r.Handle(sp, http.StripPrefix(cfg.SwaggerUI.Path, h))
 	}
 	return r
 }
